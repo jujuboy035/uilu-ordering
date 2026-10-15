@@ -1,0 +1,42 @@
+begin;
+do $$
+declare a uuid:=gen_random_uuid(); c uuid:=gen_random_uuid(); ch uuid:=gen_random_uuid(); d uuid:=gen_random_uuid(); prefix text:='kuilu-test-'||gen_random_uuid(); uid uuid; result jsonb; next_page jsonb; denied boolean; i integer;
+begin
+ insert into auth.users(id,email) values(a,a||'@example.invalid'),(c,c||'@example.invalid'),(ch,ch||'@example.invalid'),(d,d||'@example.invalid');
+ insert into public.kuilu_profiles(id,role) values(a,'admin'),(c,'customer'),(ch,'china'),(d,'driver');
+ for i in 1..52 loop insert into auth.users(id,email) values(gen_random_uuid(),prefix||'-'||i||'@example.invalid'); end loop;
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ perform set_config('request.jwt.claims',jsonb_build_object('sub',a,'role','authenticated')::text,true);
+ execute 'set local role authenticated';
+ result:=public.kuilu_list_users(prefix,0,2);
+ if (result->>'total')::int<>52 or jsonb_array_length(result->'users')<>2 then raise exception 'admin search/paging failed'; end if;
+ if exists(select 1 from jsonb_array_elements(result->'users') u where u?'encrypted_password' or u?'raw_user_meta_data' or u?'confirmation_token') then raise exception 'sensitive fields exposed'; end if;
+ next_page:=public.kuilu_list_users(prefix,2,2);
+ if exists(select 1 from jsonb_array_elements(result->'users') u cross join jsonb_array_elements(next_page->'users') n where u->>'id'=n->>'id') then raise exception 'page overlap'; end if;
+ if (public.kuilu_list_users('no-such-'||prefix,0,50)->>'total')::int<>0 then raise exception 'empty search failed'; end if;
+ denied:=false;
+ begin perform public.kuilu_list_users('',0,101); exception when invalid_parameter_value then denied:=true; end;
+ if not denied then raise exception 'pagination bounds failed'; end if;
+ execute 'reset role';
+ foreach uid in array array[c,ch,d] loop
+  perform set_config('request.jwt.claim.sub',uid::text,true);
+  perform set_config('request.jwt.claims',jsonb_build_object('sub',uid,'role','authenticated','app_metadata',jsonb_build_object('role','admin'))::text,true);
+  execute 'set local role authenticated';
+  denied:=false;
+  begin perform public.kuilu_list_users(); exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'non-admin read allowed'; end if;
+  denied:=false;
+  begin perform kuilu_private.list_users(); exception when insufficient_privilege then denied:=true; end;
+  if not denied then raise exception 'private endpoint bypass allowed'; end if;
+  execute 'reset role';
+ end loop;
+ perform set_config('request.jwt.claim.sub','',true);
+ perform set_config('request.jwt.claims','{"role":"anon"}',true);
+ execute 'set local role anon';
+ denied:=false;
+ begin perform public.kuilu_list_users(); exception when insufficient_privilege then denied:=true; end;
+ if not denied then raise exception 'anon read allowed'; end if;
+ execute 'reset role';
+end $$;
+select 'PASS: 管理员搜索与分页；无敏感认证字段；客户/工作人员/司机/匿名访问被拒；伪造角色声明无效；数据回滚' as result;
+rollback;

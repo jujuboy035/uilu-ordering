@@ -1,0 +1,15 @@
+# Local credentials and private data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+supabase/.temp/
+node_modules/
+.DS_Store
+Thumbs.db
+outputs/
+work/
+backups/
+*.dump
+*.backup

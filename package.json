@@ -1,0 +1,12 @@
+{
+  "name": "kuilu-ordering",
+  "version": "0.1.0",
+  "private": true,
+  "description": "奎陆中日手提下单系统",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node tests/check-bilingual.cjs && node tests/check-managed-edge.cjs"
+  }
+}
