@@ -44,7 +44,7 @@ run("state.cargo[0]={...fresh().cargo[0],name:'中文',nameEn:'Test',unitPrice:'
 console.log('PASS: empty-address customer render regression, declaration totals and validation');
 
 
-run("state=fresh();step=2;uiLanguage='zh-CN'");assert.equal(run('state.cargo[0].currency'),'USD');assert.equal(run('state.pickupDate'),run('dateNow()'));const simple=run('body()');assert(!simple.includes('英文品名'));assert(!simple.includes('运输箱数'));assert(!simple.includes('type="file"'));assert.equal(run('state.cargo[0].packaging'),'袋子');assert(simple.includes('list="cargo-names-0"'));assert(!simple.includes('data-preset'));assert(!simple.includes('常用品名预设'));assert(!app.includes('.upload(path,'));assert(simple.includes('袋子'));run('step=3');assert(!run('body()').includes('期望取货时间段'));console.log('PASS: simplified form defaults and removed required fields');
+run("state=fresh();step=2;uiLanguage='zh-CN'");assert.equal(run('state.cargo[0].currency'),'USD');assert.equal(run('state.pickupDate'),run('dateNow()'));const simple=run('body()');assert(!simple.includes('英文品名'));assert(!simple.includes('运输箱数'));assert(!simple.includes('type="file"'));assert.equal(run('state.cargo[0].packaging'),'袋子');assert(simple.includes('list="cargo-names-0"'));assert(!simple.includes('data-preset'));assert(!simple.includes('常用品名预设'));assert(simple.includes('袋子'));run('step=3');assert(!run('body()').includes('期望取货时间段'));console.log('PASS: simplified form defaults and removed required fields');
 
 run("uiLanguage='zh-CN';activeRole='admin';usersLoading=false;usersError='';userRows=[{id:'test',username:'test',business_role:'customer'}]");assert.equal(run('roleNames.admin'),'管理员');assert(run('isManager()'));assert(!run('isSystemAdmin()'));
 const sample="({dbId:'order',status:'pickup',driverId:'driver'})";
@@ -54,3 +54,9 @@ run("activeRole='system_admin';renderUsers()");assert(run('isSystemAdmin()'));as
 for(const role of ['customer','china_driver','japan_driver','courier']){run('activeRole='+JSON.stringify(role));assert(!run('isManager()'));assert(!run('workflowControls('+sample+')').includes('data-edit-order'))}
 run("uiLanguage='ja'");assert.equal(run('roleNames.system_admin'),'システム管理者');assert.equal(run('roleNames.china_driver'),'中国ドライバー');
 console.log('PASS: six-role UI, system-only permission controls and manager-only order editing');
+
+run("uiLanguage='zh-CN';activeRole='admin';packages=[];orders=[{dbId:'warehouse',status:'cn_warehouse',id:'TEST',cargo:[{name:'样衣'}],addressSnapshot:{cn:{name:'CN'},jp:{name:'JP'}}}];renderPackages()");assert(elements['#app'].innerHTML.includes('makePackageForm'));assert(elements['#app'].innerHTML.includes('warehouse'));
+run("activeRole='courier';renderPackages()");assert(!elements['#app'].innerHTML.includes('makePackageForm'));
+run("activeRole='admin'");assert(run("workflowControls({dbId:'x',deletedAt:'yes'})").includes('data-restore'));assert(!run("workflowControls({dbId:'x',status:'cn_warehouse',packageId:'pkg'})").includes('data-remove-order'));
+run("activeRole='customer'");assert(!run("workflowControls({dbId:'x',status:'pickup'})").includes('data-remove-order'));
+console.log('PASS: package workspace, manager-only packing/deletion, courier read-only workspace and packed-order guards');
