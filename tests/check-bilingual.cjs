@@ -60,3 +60,11 @@ run("activeRole='courier';renderPackages()");assert(!elements['#app'].innerHTML.
 run("activeRole='admin'");assert(run("workflowControls({dbId:'x',deletedAt:'yes'})").includes('data-restore'));assert(!run("workflowControls({dbId:'x',status:'cn_warehouse',packageId:'pkg'})").includes('data-remove-order'));
 run("activeRole='customer'");assert(!run("workflowControls({dbId:'x',status:'pickup'})").includes('data-remove-order'));
 console.log('PASS: package workspace, manager-only packing/deletion, courier read-only workspace and packed-order guards');
+
+assert.deepEqual(JSON.parse(JSON.stringify(run("dateRangeBounds('2026-10-15','2026-10-15')"))),{from:'2026-10-15',to:'2026-10-15'});
+assert.throws(()=>run("dateRangeBounds('2026-10-16','2026-10-15')"));assert.throws(()=>run("dateRangeBounds('2026-02-30','')"));
+run("var dateCalls=[];cloud.from=()=>{const q={select(){return q},not(){return q},is(){return q},gte(k,v){dateCalls.push(['gte',k,v]);return q},lte(k,v){dateCalls.push(['lte',k,v]);return q},order(){return q},limit(){return q}};return q};activeRole='customer';orderDateFilters.customer={start:'2026-10-15',end:'2026-10-16'};datedOrderQuery()");
+assert.deepEqual(JSON.parse(JSON.stringify(run('dateCalls'))),[['gte','payload->>pickupDate','2026-10-15'],['lte','payload->>pickupDate','2026-10-16']]);
+run("activeRole='admin';staffView='packages';dateCalls=[];datedOrderQuery()");assert.equal(run('dateCalls.length'),0);
+run("uiLanguage='ja'");assert(run('orderDateFilter()').includes('集荷日（中国時間）'));
+console.log('PASS: inclusive pickup-date server queries, invalid date ranges, no package filter leakage and Japanese captions');
