@@ -3,7 +3,7 @@ const html=fs.readFileSync('frontend/index.html','utf8');
 const scripts=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
 const i18n=scripts.at(-2).split('const originalUI=')[0],app=scripts.at(-1);
 const elements={};function element(key){return elements[key]||=( {innerHTML:'',textContent:'',style:{},classList:{toggle(){},remove(){}},remove(){}})}
-const context={document:{querySelector:element,querySelectorAll:()=>[],addEventListener(){},body:{classList:{remove(){}},prepend(){}},createElement:()=>element('new')},localStorage:{getItem:()=>null},sessionStorage:{},window:{kuiluOriginalNav:''},location:{protocol:'https:'},supabase:{createClient:()=>({})},Date,console};
+const context={document:{querySelector:element,querySelectorAll:()=>[],addEventListener(){},body:{dataset:{},classList:{remove(){}},prepend(){}},createElement:()=>element('new')},localStorage:{getItem:()=>null},sessionStorage:{},window:{kuiluOriginalNav:''},location:{protocol:'https:'},supabase:{createClient:()=>({})},Date,console};
 vm.createContext(context);
 vm.runInContext(i18n+'\n'+app.slice(0,app.indexOf('const authStyle='))+'\n'+app.slice(app.indexOf('function loginEmail('),app.indexOf('cloud.auth.onAuthStateChange')),context);
 const run=s=>vm.runInContext(s,context);
@@ -61,10 +61,10 @@ run("activeRole='admin'");assert(run("workflowControls({dbId:'x',deletedAt:'yes'
 run("activeRole='customer'");assert(!run("workflowControls({dbId:'x',status:'pickup'})").includes('data-remove-order'));
 console.log('PASS: package workspace, manager-only packing/deletion, courier read-only workspace and packed-order guards');
 
-assert.deepEqual(JSON.parse(JSON.stringify(run("dateRangeBounds('2026-10-15','2026-10-15')"))),{from:'2026-10-15',to:'2026-10-15'});
-assert.throws(()=>run("dateRangeBounds('2026-10-16','2026-10-15')"));assert.throws(()=>run("dateRangeBounds('2026-02-30','')"));
-run("var dateCalls=[];cloud.from=()=>{const q={select(){return q},not(){return q},is(){return q},gte(k,v){dateCalls.push(['gte',k,v]);return q},lte(k,v){dateCalls.push(['lte',k,v]);return q},order(){return q},limit(){return q}};return q};activeRole='customer';orderDateFilters.customer={start:'2026-10-15',end:'2026-10-16'};datedOrderQuery()");
-assert.deepEqual(JSON.parse(JSON.stringify(run('dateCalls'))),[['gte','payload->>pickupDate','2026-10-15'],['lte','payload->>pickupDate','2026-10-16']]);
+assert.equal(run("validPickupFilterDate('2026-10-15')"),'2026-10-15');assert.equal(run("validPickupFilterDate('')"),'');assert.throws(()=>run("validPickupFilterDate('2026-02-30')"));
+run("var dateCalls=[];cloud.from=()=>{const q={select(){return q},not(){return q},is(){return q},eq(k,v){dateCalls.push(['eq',k,v]);return q},order(){return q},limit(){return q}};return q};activeRole='customer';orderDateFilters.customer={date:'2026-10-15'};datedOrderQuery()");
+assert.deepEqual(JSON.parse(JSON.stringify(run('dateCalls'))),[['eq','payload->>pickupDate','2026-10-15']]);
+assert(!run('orderDateFilter()').includes('dateEnd'));assert(!run('orderDateFilter()').includes('结束日期'));assert(run('orderDateFilter()').includes('pickupFilterDate'));
 run("activeRole='admin';staffView='packages';dateCalls=[];datedOrderQuery()");assert.equal(run('dateCalls.length'),0);
 run("uiLanguage='ja'");assert(run('orderDateFilter()').includes('集荷日（中国時間）'));
-console.log('PASS: inclusive pickup-date server queries, invalid date ranges, no package filter leakage and Japanese captions');
+console.log('PASS: single pickup-date server query, no end-date input, invalid date rejection and Japanese captions');
