@@ -8,7 +8,7 @@ vm.createContext(context);
 vm.runInContext(i18n+'\n'+app.slice(0,app.indexOf('const authStyle='))+'\n'+app.slice(app.indexOf('function loginEmail('),app.indexOf('cloud.auth.onAuthStateChange')),context);
 const run=s=>vm.runInContext(s,context);
 run("uiLanguage='ja';state.pickupDate='2099-01-01';state.pickupContact='客户';addresses=[{id:'cn',country:'CN',name:'客户',region:'深圳市',street:'中国取货地址',contact:'张先生',phone:'000',pending:false},{id:'jp',country:'JP',name:'配送要求',region:'東京都',street:'日本配送地址',contact:'田中',phone:'000',postal:'100-0001',pending:false}];state.cn='cn';state.jp='jp'");
-assert.equal(run("roleNames.admin"),'日本管理者');
+assert.equal(run("roleNames.admin"),'管理者');
 assert.equal(run("statusNames.pending_review"),'集荷手配待ち');
 assert.equal(run("state.cargo[0].category"),'日用品');
 assert(run("addressCards('CN')").includes('<h3>客户'));
@@ -24,7 +24,7 @@ assert(elements['#app'].innerHTML.includes('客户@example.invalid'));
 assert(elements['#app'].innerHTML.includes('お客様'));
 assert(elements['#app'].innerHTML.includes('登録済みアカウント'));
 run("uiLanguage='zh-CN';renderUsers()");
-assert.equal(run('roleNames.admin'),'日本管理员');
+assert.equal(run('roleNames.admin'),'管理员');
 assert(elements['#app'].innerHTML.includes('现有用户账号'));
 assert.equal(run("t('登录')"),'登录');
 run("uiLanguage='ja';showAuth()");
@@ -45,3 +45,12 @@ console.log('PASS: empty-address customer render regression, declaration totals 
 
 
 run("state=fresh();step=2;uiLanguage='zh-CN'");assert.equal(run('state.cargo[0].currency'),'USD');assert.equal(run('state.pickupDate'),run('dateNow()'));const simple=run('body()');assert(!simple.includes('英文品名'));assert(!simple.includes('运输箱数'));assert(!simple.includes('type="file"'));assert.equal(run('state.cargo[0].packaging'),'袋子');assert(simple.includes('list="cargo-names-0"'));assert(!simple.includes('data-preset'));assert(!simple.includes('常用品名预设'));assert(!app.includes('.upload(path,'));assert(simple.includes('袋子'));run('step=3');assert(!run('body()').includes('期望取货时间段'));console.log('PASS: simplified form defaults and removed required fields');
+
+run("uiLanguage='zh-CN';activeRole='admin';usersLoading=false;usersError='';userRows=[{id:'test',username:'test',business_role:'customer'}]");assert.equal(run('roleNames.admin'),'管理员');assert(run('isManager()'));assert(!run('isSystemAdmin()'));
+const sample="({dbId:'order',status:'pickup',driverId:'driver'})";
+assert(run('workflowControls('+sample+')').includes('data-edit-order'));assert(run('workflowControls('+sample+')').includes('data-assign-stage'));
+run("renderUsers()");assert(!elements['#app'].innerHTML.includes('data-change-role'));assert(!elements['#app'].innerHTML.includes('data-reset-account'));
+run("activeRole='system_admin';renderUsers()");assert(run('isSystemAdmin()'));assert(elements['#app'].innerHTML.includes('data-change-role'));
+for(const role of ['customer','china_driver','japan_driver','courier']){run('activeRole='+JSON.stringify(role));assert(!run('isManager()'));assert(!run('workflowControls('+sample+')').includes('data-edit-order'))}
+run("uiLanguage='ja'");assert.equal(run('roleNames.system_admin'),'システム管理者');assert.equal(run('roleNames.china_driver'),'中国ドライバー');
+console.log('PASS: six-role UI, system-only permission controls and manager-only order editing');

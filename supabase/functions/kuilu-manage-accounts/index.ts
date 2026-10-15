@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.3";
 
 const allowedOrigins=new Set(["https://kuilu-ordering.wavypond9.chatgpt.site"]);
-const roles=new Set(["customer","china","admin","driver"]);
+const roles=new Set(["customer","china_driver","admin","japan_driver","system_admin","courier"]);
 const usernamePattern=/^[a-z0-9][a-z0-9._-]{2,31}$/;
 function createHandler(admin) {
  return async(req)=>{
@@ -22,7 +22,8 @@ function createHandler(admin) {
    const actor=identity.data.user;
    const profile=await admin.from("kuilu_profiles").select("role").eq("id",actor.id).maybeSingle();
    if(profile.error)return respond({error:"暂时无法核对权限"},503);
-   if(profile.data?.role!=="admin")return respond({error:"仅管理员可管理账号"},403);
+   const actorRole=profile.data?.role;
+   if(!["admin","system_admin"].includes(actorRole))return respond({error:"仅管理员可管理账号"},403);
    const reader=req.body?.getReader();let bytes=0,text="";
    if(!reader)return respond({error:"请求内容无效"},400);
    const decoder=new TextDecoder();
@@ -35,6 +36,7 @@ function createHandler(admin) {
    if(body.action==="create"){
     const username=typeof body.username==="string"?body.username.trim().toLowerCase():"";
     if(!usernamePattern.test(username)||!roles.has(body.role))return respond({error:"账号或角色格式无效"},400);
+    if(body.role==="system_admin"&&actorRole!=="system_admin")return respond({error:"仅系统管理员可创建系统管理员账号"},403);
     const existing=await admin.from("kuilu_profiles").select("id").eq("username",username).maybeSingle();
     if(existing.error)return respond({error:"暂时无法检查账号"},503);
     if(existing.data)return respond({error:"账号已存在"},409);
@@ -46,6 +48,7 @@ function createHandler(admin) {
     return respond({id:result.data.user.id,username,role:body.role},201);
    }
    if(body.action==="reset_password"){
+    if(actorRole!=="system_admin")return respond({error:"仅系统管理员可重设密码"},403);
     if(typeof body.user_id!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.user_id))return respond({error:"账号编号无效"},400);
     const target=await admin.auth.admin.getUserById(body.user_id);
     if(target.error||!target.data.user)return respond({error:"账号不存在"},404);
